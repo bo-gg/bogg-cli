@@ -35,6 +35,7 @@ def cli(ate, calories, note):
         auth=('admin', 'changeme'),
         json=payload,
     )
+
     try:
         response.raise_for_status()
     except:
@@ -42,6 +43,17 @@ def cli(ate, calories, note):
         print response
 
     click.echo(click.style('Logged {} calories.'.format(calories), fg='green'))
+
+    date_string = datetime.date.today()
+    response = requests.get(
+        'http://localhost:8000/api/daily/{}'.format(date_string),
+        auth=('admin', 'changeme'),
+    )
+    data = response.json()
+    click.echo(' - You have eaten {} calories.'.format(data['calories_consumed']))
+    click.echo(' - You have exercised {} calories.'.format(data['calories_expended']))
+    click.echo(' - You have {} calories remaining today.'.format(data['net_calories']))
+
 
 
 def add_shortcut():
