@@ -132,6 +132,8 @@ def enrollment():
 
     data = enroll_user(payload)
 
+    token = get_token(username, password)
+
     click.echo('User: {} created. Your daily calorie goal is: {}'.format(
         data['username'],
         data['bogger']['current_calorie_goal']
@@ -139,6 +141,21 @@ def enrollment():
     click.echo()
     click.echo('You are now ready to start logging. Simply run \'bogg\' from your ' +
                'command line to start logging!')
+
+
+def get_token(username, password):
+    payload = { 'username': username, 'password': password }
+    response = requests.post(
+        'http://localhost:8000/api/token-auth/',
+        json=payload,
+    )
+    try:
+        response.raise_for_status()
+    except:
+        click.echo('Invalid login.')
+        return None
+    return response.json()['token']
+
 
 def enroll_user(payload):
     while True:
@@ -160,29 +177,31 @@ def enroll_user(payload):
                 new_val = click.prompt('Enter another {}'.format(field))
                 payload[field] = new_val
 
-def create_ini():
-
+def create_ini(username, token):
     config = ConfigParser.RawConfigParser()
+    config.add_section('auth')
+    config.set('auth', 'username', username)
+    config.set('auth', 'token', token)
 
-    # When adding sections or items, add them in the reverse order of
-    # how you want them to be displayed in the actual file.
-    # In addition, please note that using RawConfigParser's and the raw
-    # mode of ConfigParser's respective set functions, you can assign
-    # non-string values to keys internally, but will receive an error
-    # when attempting to write to a file or when you get it in non-raw
-    # mode. SafeConfigParser does not allow such assignments to take place.
-    config.add_section('Section1')
-    config.set('Section1', 'an_int', '15')
-    config.set('Section1', 'a_bool', 'true')
-    config.set('Section1', 'a_float', '3.1415')
-    config.set('Section1', 'baz', 'fun')
-    config.set('Section1', 'bar', 'Python')
-    config.set('Section1', 'foo', '%(bar)s is %(baz)s!')
-
-    # Writing our configuration file to 'example.cfg'
-    with open('example.cfg', 'wb') as configfile:
+    with open('bogg.cfg', 'wb') as configfile:
         config.write(configfile)
 
+username = None
+token = None
+
+def read_ini():
+    global username
+    global token
+    config = ConfigParser.RawConfigParser()
+    config.read('bogg.cfg')
+    username = config.get('auth', 'username')
+    token = config.get('auth', 'token')
+
+def prompt_login():
+    username = click.prompt('Username')
+    password = click.prompt('Password', hide_input=True)
+    token = get_token(username, password)
+    create_ini(username, token)
 
 def create_measurement(weight):
     raise NotImplementedError('Weight measurement not implemented.')
@@ -308,7 +327,7 @@ def interactive():
     elif c == 6:
         show_status()
     elif c == 7:
-        show_log()
+        prompt_login()
     elif c == 8:
         setup()
         #TODO: Edit page for config
