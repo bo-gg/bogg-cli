@@ -1,6 +1,8 @@
+import datetime
+import ConfigParser
+
 import click
 import requests
-import datetime
 
 @click.command()
 @click.option('--ate/--exercised', default=True, help="Ate or Exercised (default: Ate)")
@@ -33,7 +35,7 @@ def cli(ate, calories, note):
 
 
 def setup():
-    new_user()
+    enrollment()
 
 def log():
     pass
@@ -41,7 +43,7 @@ def log():
 def add_shortcut(calories, note):
     pass
 
-def new_user():
+def enrollment():
     '''
     {
         "username": "ben16",
@@ -113,38 +115,23 @@ def new_user():
     height = click.prompt('Enter your height (in inches)', type=int)
     weight = click.prompt('Enter your weight (in pounds)', type=int)
     click.echo()
-    while True:
-        payload = {
-            'username': username,
-            'email': email,
-            'password': password,
-            'daily_weight_goal': daily_weight_goal,
-            'height': height,
-            'weight': weight,
-            'activity_factor': activity_factor,
-            'bogger': {
-                'gender': gender,
-                'birthdate': birthdate,
-                'auto_update_goal': True
-            }
+    payload = {
+        'username': username,
+        'email': email,
+        'password': password,
+        'daily_weight_goal': daily_weight_goal,
+        'height': height,
+        'weight': weight,
+        'activity_factor': activity_factor,
+        'bogger': {
+            'gender': gender,
+            'birthdate': birthdate,
+            'auto_update_goal': True
         }
+    }
 
-        response = requests.post(
-            'http://localhost:8000/api/create/',
-            json=payload,
-        )
+    data = enroll_user(payload)
 
-        try:
-            response.raise_for_status()
-            break
-        except:
-            data = response.json()
-            if 'username' in data.keys():
-                click.echo('Invalid username ({}): {}'.format(username, data['username'][0]))
-                username = click.prompt('Choose another username')
-            #TODO: handle other fields
-
-    data = response.json()
     click.echo('User: {} created. Your daily calorie goal is: {}'.format(
         data['username'],
         data['bogger']['current_calorie_goal']
@@ -153,6 +140,48 @@ def new_user():
     click.echo('You are now ready to start logging. Simply run \'bogg\' from your ' +
                'command line to start logging!')
 
+def enroll_user(payload):
+    while True:
+        response = requests.post(
+            'http://localhost:8000/api/create/',
+            json=payload,
+        )
+        try:
+            response.raise_for_status()
+            return response.json()
+        except:
+            data = response.json()
+            for field in data.keys():
+                click.echo('Invalid {} ({}): {}'.format(
+                    field,
+                    payload[field],
+                    ', '.join(data[field]),
+                ))
+                new_val = click.prompt('Enter another {}'.format(field))
+                payload[field] = new_val
+
+def create_ini():
+
+    config = ConfigParser.RawConfigParser()
+
+    # When adding sections or items, add them in the reverse order of
+    # how you want them to be displayed in the actual file.
+    # In addition, please note that using RawConfigParser's and the raw
+    # mode of ConfigParser's respective set functions, you can assign
+    # non-string values to keys internally, but will receive an error
+    # when attempting to write to a file or when you get it in non-raw
+    # mode. SafeConfigParser does not allow such assignments to take place.
+    config.add_section('Section1')
+    config.set('Section1', 'an_int', '15')
+    config.set('Section1', 'a_bool', 'true')
+    config.set('Section1', 'a_float', '3.1415')
+    config.set('Section1', 'baz', 'fun')
+    config.set('Section1', 'bar', 'Python')
+    config.set('Section1', 'foo', '%(bar)s is %(baz)s!')
+
+    # Writing our configuration file to 'example.cfg'
+    with open('example.cfg', 'wb') as configfile:
+        config.write(configfile)
 
 
 def create_measurement(weight):
@@ -215,6 +244,7 @@ def show_status():
         click.echo(
             click.style(message, fg='green')
         )
+
 
 def show_log():
     response = requests.get(
