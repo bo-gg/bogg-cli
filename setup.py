@@ -12,6 +12,9 @@ setup(
         [console_scripts]
         bogg=cli:cli
         bogg-interactive=cli:interactive
-        bogg-add-entry=cli:add_entry
+        bogg-config=cli:setup
+        bogg-log=cli:log
+        bogg-status=cli:status
+        bogg-add-entry=cli:add_shortcut
     ''',
 )
