@@ -74,11 +74,13 @@ def new_user():
                'how many calories you should be eating per day.')
     click.echo()
     click.echo('Activity Level (https://en.wikipedia.org/wiki/Physical_activity_level)')
+    click.echo()
     click.echo('  1. Sedentary')
     click.echo('  2. Lightly Active')
     click.echo('  3. Moderately Active')
     click.echo('  4. Very Active')
     click.echo('  5. Extra Active')
+    click.echo()
     click.echo('Enter your activity level: ', nl=False)
     while True:
         c = click.getchar()
@@ -110,7 +112,7 @@ def new_user():
     birthdate = click.prompt('Enter your birthdate (YYYY-MM-DD)')
     height = click.prompt('Enter your height (in inches)', type=int)
     weight = click.prompt('Enter your weight (in pounds)', type=int)
-
+    click.echo()
     while True:
         payload = {
             'username': username,
@@ -147,6 +149,9 @@ def new_user():
         data['username'],
         data['bogger']['current_calorie_goal']
     ))
+    click.echo()
+    click.echo('You are now ready to start logging. Simply run \'bogg\' from your ' +
+               'command line to start logging!')
 
 
 
