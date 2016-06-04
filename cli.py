@@ -1,8 +1,9 @@
 import datetime
-import ConfigParser
 
 import click
 import requests
+
+import bogg_utils
 
 @click.command()
 @click.option('--ate/--exercised', default=True, help="Ate or Exercised (default: Ate)")
@@ -22,8 +23,12 @@ def cli(ate, calories, note):
        bogg sunset-jog             (Log my sunset jog, which I've pre-defined in my lookups)
 
     """
+    if not bogg_utils.TOKEN:
+        setup()
+
     if not calories:
-        interactive()
+        while interactive():
+            pass
         return
 
     if calories.isdigit():
@@ -35,7 +40,25 @@ def cli(ate, calories, note):
 
 
 def setup():
-    enrollment()
+    click.echo('Welcome to bo.gg!')
+    click.echo('')
+    click.echo('1: Existing user')
+    click.echo('2: New user')
+    click.echo('')
+    click.echo('Command? ', nl=False)
+    while True:
+        c = click.getchar()
+        if c.isdigit():
+            break
+        click.echo('Invalid option.')
+
+    click.echo()
+    c = int(c)
+    if c == 1:
+        if not prompt_login():
+            exit()
+    else:
+        enrollment()
 
 def log():
     pass
@@ -132,7 +155,8 @@ def enrollment():
 
     data = enroll_user(payload)
 
-    token = get_token(username, password)
+    bogg_utils.USERNAME = username
+    token = bogg_utils.retrieve_token(password)
 
     click.echo('User: {} created. Your daily calorie goal is: {}'.format(
         data['username'],
@@ -142,25 +166,10 @@ def enrollment():
     click.echo('You are now ready to start logging. Simply run \'bogg\' from your ' +
                'command line to start logging!')
 
-
-def get_token(username, password):
-    payload = { 'username': username, 'password': password }
-    response = requests.post(
-        'http://localhost:8000/api/token-auth/',
-        json=payload,
-    )
-    try:
-        response.raise_for_status()
-    except:
-        click.echo('Invalid login.')
-        return None
-    return response.json()['token']
-
-
 def enroll_user(payload):
     while True:
         response = requests.post(
-            'http://localhost:8000/api/create/',
+            '{}/api/create/'.format(bogg_utils.API_BASE),
             json=payload,
         )
         try:
@@ -177,31 +186,20 @@ def enroll_user(payload):
                 new_val = click.prompt('Enter another {}'.format(field))
                 payload[field] = new_val
 
-def create_ini(username, token):
-    config = ConfigParser.RawConfigParser()
-    config.add_section('auth')
-    config.set('auth', 'username', username)
-    config.set('auth', 'token', token)
-
-    with open('bogg.cfg', 'wb') as configfile:
-        config.write(configfile)
-
-username = None
-token = None
-
-def read_ini():
-    global username
-    global token
-    config = ConfigParser.RawConfigParser()
-    config.read('bogg.cfg')
-    username = config.get('auth', 'username')
-    token = config.get('auth', 'token')
 
 def prompt_login():
-    username = click.prompt('Username')
+    bogg_utils.USERNAME = click.prompt('Username')
     password = click.prompt('Password', hide_input=True)
-    token = get_token(username, password)
-    create_ini(username, token)
+    try:
+        bogg_utils.retrieve_token(password)
+    except requests.exceptions.HTTPError as ex:
+        if ex.response.status_code == 400:
+            click.echo('Invalid login')
+            return False
+        else:
+            raise
+    del password
+    return True
 
 def create_measurement(weight):
     raise NotImplementedError('Weight measurement not implemented.')
@@ -223,8 +221,8 @@ def create_entry(calories, note, ate=True, dt_occurred=None):
         payload['note'] = 'Command line entry with no note.'
 
     response = requests.post(
-        'http://localhost:8000/api/entries/',
-        auth=('admin', 'changeme'),
+        '{}/api/entries/'.format(bogg_utils.API_BASE),
+        headers={'Authorization': 'Token {}'.format(bogg_utils.TOKEN)},
         json=payload,
     )
 
@@ -242,10 +240,19 @@ def create_entry(calories, note, ate=True, dt_occurred=None):
 def show_status():
     date_string = datetime.date.today()
     response = requests.get(
-        'http://localhost:8000/api/daily/{}'.format(date_string),
-        auth=('admin', 'changeme'),
+        '{}/api/daily/{}'.format(bogg_utils.API_BASE, date_string),
+        headers={'Authorization': 'Token {}'.format(bogg_utils.TOKEN)},
     )
+    try:
+        response.raise_for_status()
+    except requests.exceptions.HTTPError as ex:
+        if response.status_code == 404:
+            click.echo(' - No log entries for today.')
+            return
+        else:
+            raise
     data = response.json()
+
     click.echo(' - You have eaten {} calories.'.format(data['calories_consumed']))
     click.echo(' - You have burned off {} calories.'.format(abs(data['calories_expended'])))
     if data['calories_remaining'] > 0:
@@ -267,8 +274,8 @@ def show_status():
 
 def show_log():
     response = requests.get(
-        'http://localhost:8000/api/daily/',
-        auth=('admin', 'changeme'),
+        '{}/api/daily/'.format(bogg_utils.API_BASE),
+        headers={'Authorization': 'Token {}'.format(bogg_utils.TOKEN)},
     )
     data = response.json()['results']
     for entry in data:
@@ -286,7 +293,8 @@ def show_log():
         ))
 
 
-def interactive():
+def interactive_menu():
+    click.echo()
     click.echo('1: Log calories eaten.')
     click.echo('2: Log calories exercised.')
     click.echo('3: Record a new weight measurement.')
@@ -295,15 +303,30 @@ def interactive():
     click.echo('6: View status for today.')
     click.echo('7: View a log of the past few days.')
     click.echo('8: Edit configuration.')
-    click.echo('Command? ', nl=False)
-    while True:
-        c = click.getchar()
-        if c.isdigit():
-            break
-        click.echo('Invalid option.')
-
     click.echo()
-    c = int(c)
+    click.echo('?: This menu.')
+    click.echo('Q: Quit.')
+    click.echo()
+
+def interactive():
+    interactive_menu()
+    while True:
+        click.echo('Command? ', nl=False)
+        c = click.getchar().lower()
+        valid_commands = [str(i) for i in range(9)] + ['q', '?']
+        if c in valid_commands:
+            if c == '?':
+                interactive_menu()
+            elif c == 'q':
+                quit()
+            else:
+                click.echo()
+                c = int(c)
+                process_command(c)
+        else:
+            click.echo('Invalid option.')
+
+def process_command(c):
     if c == 1 or c == 2:
         ate = c == 1
         calories = click.prompt('Number of calories', type=int)
@@ -327,8 +350,11 @@ def interactive():
     elif c == 6:
         show_status()
     elif c == 7:
-        prompt_login()
+        show_log()
     elif c == 8:
         setup()
         #TODO: Edit page for config
         pass
+    elif c == 9:
+        return False
+    return True
