@@ -6,7 +6,7 @@ import requests
 
 USERNAME = None
 TOKEN = None
-API_BASE = 'http://127.0.0.1:8000'
+API_BASE = 'https://bo.gg'
 
 
 def create_config():
