@@ -134,11 +134,11 @@ gender_buttons = [
 
 
 flow = [
-    urwid.Pile([urwid.Edit('Choose a username:\n')]),
-    urwid.Pile([urwid.Edit('Enter your email:\n')]),
-    urwid.Pile([urwid.Edit('Choose a password:\n', mask=u'*')]),
-    urwid.Pile([urwid.Edit('Confirm password:\n', mask=u'*')]),
-    urwid.Pile([urwid.Edit('How many pounds do you want to lose per week? (Usually between 0.5 and 2.0):\n')]),
+    urwid.Pile([urwid.Edit(('I say', 'Choose a username:\n'))]),
+    urwid.Pile([urwid.Edit(('I say', 'Enter your email:\n'))]),
+    urwid.Pile([urwid.Edit(('I say', 'Choose a password:\n'), mask=u'*')]),
+    urwid.Pile([urwid.Edit(('I say', 'Confirm password:\n'), mask=u'*')]),
+    urwid.Pile([urwid.Edit(('I say', 'How many pounds do you want to lose per week? (Usually between 0.5 and 2.0):\n'))]),
     urwid.Pile([
         urwid.Text('The following questions are only used to calculate your basic metabolic rate and figure out ' \
                'how many calories you should be eating per day.\n'),
@@ -184,9 +184,48 @@ class ConversationListBox(urwid.ListBox):
     def radio_callback(self, radio_button, new_state):
         self.next_question()
 
-palette = [('prompt', 'default,bold', 'default'),]
+palette = [
+    ('body','black','light gray', 'standout'),
+    ('border','black','dark blue'),
+    ('shadow','white','black'),
+    ('selectable','black', 'dark cyan'),
+    ('focus','white','dark blue','bold'),
+    ('focustext','light gray','dark blue'),
+    ('I say', 'dark blue,bold', 'light gray'),
+
+]
+
 conversation = ConversationListBox()
+
+body = conversation
+width = ('relative', 80)
+height = ('relative', 80)
+
+frame = urwid.Frame(body)
+frame.header = urwid.Pile(
+    [urwid.Text('Bo.gg'),
+    urwid.Divider()]
+)
+w = frame
+
+# pad area around conversation
+w = urwid.Padding(w, ('fixed left',2), ('fixed right',2))
+w = urwid.Filler(w, ('fixed top',1), ('fixed bottom',1))
+w = urwid.AttrWrap(w, 'body')
+
+# "shadow" effect
+w = urwid.Columns( [w,('fixed', 2, urwid.AttrWrap(
+    urwid.Filler(urwid.Text(('border','  ')), "top")
+    ,'shadow'))])
+w = urwid.Frame( w, footer =
+    urwid.AttrWrap(urwid.Text(('border','  ')),'shadow'))
+
+# outermost border area
+w = urwid.Padding(w, 'center', width )
+w = urwid.Filler(w, 'middle', height )
+w = urwid.AttrWrap( w, 'border' )
+
 for button in activity_buttons + gender_buttons:
     urwid.connect_signal(button, 'change', conversation.radio_callback)
 
-urwid.MainLoop(conversation, palette).run()
+urwid.MainLoop(w, palette).run()
