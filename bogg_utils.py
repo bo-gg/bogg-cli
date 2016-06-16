@@ -1,4 +1,5 @@
 import os
+import datetime
 import ConfigParser
 
 import click
@@ -7,6 +8,8 @@ import requests
 USERNAME = None
 TOKEN = None
 API_BASE = 'http://127.0.0.1:8000'
+CONFIG_PATH = 'bogg.cfg'
+CURRENT_DATE = datetime.date.today()
 
 
 def create_config():

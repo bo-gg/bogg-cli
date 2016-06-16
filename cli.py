@@ -1,4 +1,5 @@
 import datetime
+import calendar
 
 import click
 import requests
@@ -7,9 +8,10 @@ import bogg_utils
 
 @click.command()
 @click.option('--ate/--exercised', default=True, help="Ate or Exercised (default: Ate)")
+@click.option('--date', default=datetime.date.today(), help="Date in which entry occurred.")
 @click.argument('calories', required=False)
 @click.argument('note', required=False)
-def cli(ate, calories, note):
+def cli(ate, calories, note, date):
     """Command line interface for bo.gg
 
     Examples:
@@ -23,6 +25,7 @@ def cli(ate, calories, note):
        bogg sunset-jog             (Log my sunset jog, which I've pre-defined in my lookups)
 
     """
+    bogg_utils.CURRENT_DATE = date
     if not bogg_utils.TOKEN:
         setup()
 
@@ -207,14 +210,12 @@ def create_measurement(weight):
 def create_entry(calories, note, ate=True, dt_occurred=None):
     if not ate:
         calories = calories * -1
-    if not dt_occurred:
-        dt_occurred = datetime.datetime.now()
 
     payload = {
         'entry_type': 'C' if ate else 'E',
         'calories': calories,
         'note': note,
-        'dt_occurred': str(dt_occurred)
+        'dt_occurred': str(bogg_utils.CURRENT_DATE)
     }
 
     if not note:
@@ -293,12 +294,30 @@ def show_log():
         ))
 
 
+def draw_calendar():
+    click.echo('Su Mo Tu We Th Fr Sa')
+    dates = calendar.monthcalendar(
+        bogg_utils.CURRENT_DATE.year,
+        bogg_utils.CURRENT_DATE.month
+    )
+    for week in dates:
+        for day in week:
+            if day == 0:
+                click.echo('   ', nl=False)
+            else:
+                click.echo(str(day).ljust(3), nl=False)
+        click.echo()
+
+
 def interactive_menu():
+    dateline = 'Currently entering data for: {}'.format(bogg_utils.CURRENT_DATE)
+    click.echo(dateline)
+    click.echo('- Use [ / ] to page through dates.')
     click.echo()
     click.echo('1: Log calories eaten.')
     click.echo('2: Log calories exercised.')
     click.echo('3: Record a new weight measurement.')
-    click.echo('4: Log an item from your quick-lookups.')
+    click.echo('4: Select another date.')
     click.echo('5: Add an item to your quick-lookups.')
     click.echo('6: View status for today.')
     click.echo('7: View a log of the past few days.')
@@ -313,12 +332,16 @@ def interactive():
     while True:
         click.echo('Command? ', nl=False)
         c = click.getchar().lower()
-        valid_commands = [str(i) for i in range(9)] + ['q', '?']
+        valid_commands = [str(i) for i in range(9)] + ['[', ']', 'q', '?']
         if c in valid_commands:
             if c == '?':
                 interactive_menu()
             elif c == 'q':
                 quit()
+            elif c == '[' or c == ']':
+                delta = 1 if c == ']' else -1
+                bogg_utils.CURRENT_DATE += datetime.timedelta(days=delta)
+                interactive_menu()
             else:
                 click.echo()
                 c = int(c)
@@ -352,9 +375,7 @@ def process_command(c):
     elif c == 7:
         show_log()
     elif c == 8:
-        setup()
-        #TODO: Edit page for config
-        pass
+        click.edit(filename=bogg_utils.CONFIG_PATH)
     elif c == 9:
         return False
     return True
