@@ -154,6 +154,12 @@ flow = [
 
 flow_index = 0
 
+log = open('log.txt', 'w')
+
+def logline(msg):
+    log.write(msg + '\n')
+    log.flush()
+
 class ConversationListBox(urwid.ListBox):
     def __init__(self):
         self.flow_index = 0
@@ -170,7 +176,13 @@ class ConversationListBox(urwid.ListBox):
         # replace or add response
         # self.focus.contents[1:] = [(answer(name), self.focus.options())]
         # add a new question
+
         if self.focus_position == self.flow_index:
+            msg = 'Focus position: {}, Length: {}'.format(self.focus_position, len(flow))
+            logline(msg)
+            if self.focus_position == len(flow) - 1:
+                logline('exiting!')
+                raise urwid.ExitMainLoop()
             self.next_question()
         else:
             self.focus_position += 1
